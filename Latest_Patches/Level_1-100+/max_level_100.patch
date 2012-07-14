@@ -1,0 +1,38 @@
+# User M.hack3r@yahoo.com
+# Date 1303654384 -14400
+# Node ID 0520b5108ca519e3792b4bfd52ed6c55a281d99b
+# Parent  53afb07ddd95f03e62b54f61effa26468f4e46aa
+
+diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
+--- a/src/server/game/World/World.cpp
++++ b/src/server/game/World/World.cpp
+@@ -728,12 +728,6 @@
+     else
+         m_int_configs[CONFIG_MAX_PLAYER_LEVEL] = sConfig->GetIntDefault("MaxPlayerLevel", DEFAULT_MAX_LEVEL);
+ 
+-    if (m_int_configs[CONFIG_MAX_PLAYER_LEVEL] > MAX_LEVEL)
+-    {
+-        sLog->outError("MaxPlayerLevel (%i) must be in range 1..%u. Set to %u.",m_int_configs[CONFIG_MAX_PLAYER_LEVEL],MAX_LEVEL,MAX_LEVEL);
+-        m_int_configs[CONFIG_MAX_PLAYER_LEVEL] = MAX_LEVEL;
+-    }
+-
+     m_int_configs[CONFIG_MIN_DUALSPEC_LEVEL] = sConfig->GetIntDefault("MinDualSpecLevel", 40);
+ 
+     m_int_configs[CONFIG_START_PLAYER_LEVEL] = sConfig->GetIntDefault("StartPlayerLevel", 1);
+
+diff --git a/src/server/worldserver/worldserver.conf.dist b/src/server/worldserver/worldserver.conf.dist
+--- a/src/server/worldserver/worldserver.conf.dist
++++ b/src/server/worldserver/worldserver.conf.dist
+@@ -1033,9 +1033,9 @@
+ #        Description: Maximum level that can be reached by players.
+ #        Important:   Levels beyond 100 are not recommended at all.
+ #        Range:       1-255
+-#        Default:     80
+-
+-MaxPlayerLevel = 80
++#        Default:     100
++
++MaxPlayerLevel = 100
+ 
+ #
+ #    MinDualSpecLevel

@@ -1,0 +1,578 @@
+# User M.hack3r@yahoo.com
+# Date 1304361031 -14400
+# Node ID d27f4478e3b7bc17abe3ba5aaf4afb579d6d957d
+# Parent  4a53fbdd1bb43d639ee3cff1f04dbc872a019837
+@ядро: chatspy под 19968
+
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 sql/chatspy_sql/chat_spy_sql.sql
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/sql/chatspy_sql/chat_spy_sql.sql	Mon May 02 22:30:31 2011 +0400
+@@ -0,0 +1,10 @@
++INSERT INTO `trinity_string` (`entry`, `content_default`, `content_loc1`, `content_loc2`, `content_loc3`, `content_loc4`, `content_loc5`, `content_loc6`, `content_loc7`, `content_loc8`) VALUES  
++(11600, 'ChatSpy appended to player |cffff0000%s|r(%u)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),  
++(11601, 'ChatSpy for player |cffff0000%s|r(%u) cancelled by massive ChatSpy cancel.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),  
++(11602, 'All ChatSpys reset.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),  
++(11603, 'Player %s(%u) has no ChatSpy.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),  
++(11604, 'You were ChatSpying player, cancelled.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),  
++(11605, '%s(%u) was ChatSpying player, cancelled.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),  
++(11606, 'List of ChatSpys appended', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),  
++(11607, 'Total: %u', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),  
++(11608, '%s(%u) spys |cffff0000%s|r(%u)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+\ No newline at end of file
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Chat/Channels/Channel.cpp
+--- a/src/server/game/Chat/Channels/Channel.cpp	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Chat/Channels/Channel.cpp	Mon May 02 22:30:31 2011 +0400
+@@ -639,6 +639,11 @@
+     }
+     else
+     {
++        // ChatSpy
++        for(PlayerList::iterator itr = players.begin(); itr != players.end(); ++itr)
++            if(Player* pl = sObjectMgr->GetPlayer(itr->first))
++                pl->HandleChatSpyMessage(what, CHAT_MSG_CHANNEL, lang, plr, GetName());
++
+         uint32 messageLength = strlen(what) + 1;
+ 
+         WorldPacket data(SMSG_MESSAGECHAT, 1+4+8+4+m_name.size()+1+8+4+messageLength+1);
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Chat/Chat.cpp
+--- a/src/server/game/Chat/Chat.cpp	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Chat/Chat.cpp	Mon May 02 22:30:31 2011 +0400
+@@ -328,6 +328,15 @@
+         { NULL,             0,                  false, NULL,                                                "", NULL }
+     };
+ 
++    static ChatCommand chatspyCommandTable[] =
++     {
++         { "reset",          SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleChatSpyResetCommand>,        "", NULL },
++         { "cancel",         SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleChatSpyCancelCommand>,       "", NULL },
++         { "status",         SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleChatSpyStatusCommand>,       "", NULL },
++         { "",               SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleChatSpySetCommand>,          "", NULL },
++         { NULL,             0,                  false, NULL,                                           "", NULL }
++     };
++
+     static ChatCommand commandTable[] =
+     {
+         { "character",      SEC_GAMEMASTER,     true,  NULL,                                           "", characterCommandTable},
+@@ -339,6 +348,7 @@
+         { "reset",          SEC_ADMINISTRATOR,  true,  NULL,                                           "", resetCommandTable    },
+         { "instance",       SEC_ADMINISTRATOR,  true,  NULL,                                           "", instanceCommandTable },
+         { "server",         SEC_ADMINISTRATOR,  true,  NULL,                                           "", serverCommandTable   },
++        { "chatspy",        SEC_ADMINISTRATOR,  false, NULL,                                           "", chatspyCommandTable  },
+ 
+         { "channel",        SEC_ADMINISTRATOR, true, NULL,                                             "", channelCommandTable  },
+ 
+@@ -820,6 +830,38 @@
+     return 1;
+ }
+ 
++char const *fmtstring( char const *format, ... )
++{
++    va_list        argptr;
++    #define    MAX_FMT_STRING    32000
++    static char        temp_buffer[MAX_FMT_STRING];
++    static char        string[MAX_FMT_STRING];
++    static int        index = 0;
++    char    *buf;
++    int len;
++
++    va_start(argptr, format);
++    vsnprintf(temp_buffer,MAX_FMT_STRING, format, argptr);
++    va_end(argptr);
++
++    len = strlen(temp_buffer);
++
++    if( len >= MAX_FMT_STRING )
++        return "ERROR";
++
++    if (len + index >= MAX_FMT_STRING-1)
++    {
++        index = 0;
++    }
++
++    buf = &string[index];
++    memcpy( buf, temp_buffer, len+1 );
++
++    index += len + 1;
++
++    return buf;
++}
++
+ bool ChatHandler::isValidChatMessage(const char* message)
+ {
+ /*
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Chat/Chat.h
+--- a/src/server/game/Chat/Chat.h	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Chat/Chat.h	Mon May 02 22:30:31 2011 +0400
+@@ -340,6 +340,12 @@
+ 
+         bool HandleTempGameObjectCommand(const char* args);
+ 
++        // ChatSpy
++        bool HandleChatSpyResetCommand(const char * args);
++        bool HandleChatSpyCancelCommand(const char * args);
++        bool HandleChatSpySetCommand(const char * args);
++        bool HandleChatSpyStatusCommand(const char * args);
++
+         //! Development Commands
+ 
+         /*bool HandleQuestAdd(const char * args);
+@@ -404,4 +410,5 @@
+         Print* m_print;
+ };
+ 
++char const *fmtstring( char const *format, ... );
+ #endif
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Chat/Commands/Level3.cpp
+--- a/src/server/game/Chat/Commands/Level3.cpp	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Chat/Commands/Level3.cpp	Mon May 02 22:30:31 2011 +0400
+@@ -4704,3 +4704,116 @@
+     m_session->GetPlayer()->StopCastingBindSight();
+     return true;
+ }
++bool ChatHandler::HandleChatSpySetCommand(const char *args)
++{
++    if(!args)
++        return false;
++
++    char* name = strtok((char*)args, " ");
++    std::string cname;
++    Player* target = NULL;
++
++    if(name)
++    {
++        cname = name;
++        normalizePlayerName(cname);
++        target = sObjectMgr->GetPlayer(cname.c_str());
++    }
++    else
++        target = getSelectedPlayer();
++
++    if(!target || target->GetSession() == m_session)
++    {
++        SendSysMessage(LANG_PLAYER_NOT_FOUND);
++        SetSentErrorMessage(true);
++        return false;
++    }
++
++    target->m_chatSpyGuid = m_session->GetPlayer()->GetGUID();
++    PSendSysMessage(LANG_CHATSPY_APEENDED, target->GetName(), target->GetGUIDLow());
++    return true;
++}
++bool ChatHandler::HandleChatSpyResetCommand(const char* /*args*/)
++{
++    HashMapHolder<Player>::MapType &m = HashMapHolder<Player>::GetContainer();
++    HashMapHolder<Player>::MapType::iterator itr = m.begin();
++    for(; itr != m.end(); ++itr)
++    {
++        Player* plr = itr->second->GetSession()->GetPlayer();
++        if (plr && plr->m_chatSpyGuid)
++        {
++            if(Player* spy = sObjectMgr->GetPlayer(plr->m_chatSpyGuid))
++                if(spy->IsInWorld())
++                    ChatHandler(spy).PSendSysMessage(LANG_CHATSPY_CANCELLEDMASSIVE,
++                        plr->GetName(), plr->GetGUIDLow());
++            plr->m_chatSpyGuid = 0;
++        }
++    }
++    SendSysMessage("All |cff00cc00ChatSpy|rs reset.");
++    return true;
++}
++bool ChatHandler::HandleChatSpyCancelCommand(const char* args)
++{
++    if(!args)
++        return false;
++
++    char* name = strtok((char*)args, " ");
++    std::string cname;
++    Player* target = NULL;
++
++    if(name)
++    {
++        cname = name;
++        normalizePlayerName(cname);
++        target = sObjectMgr->GetPlayer(cname.c_str());
++    }
++    else
++        target = getSelectedPlayer();
++
++    if(!target || target->GetSession() == m_session)
++    {
++        SendSysMessage(LANG_PLAYER_NOT_FOUND);
++        SetSentErrorMessage(true);
++        return false;
++    }
++
++    // ok, player found
++    if(!target->m_chatSpyGuid)
++    {
++        PSendSysMessage(LANG_CHATSPY_NOCHATSPY, target->GetName(), target->GetGUIDLow());
++        SetSentErrorMessage(true);
++        return false;
++    }
++    if(target->m_chatSpyGuid == m_session->GetPlayer()->GetGUID())
++        SendSysMessage(LANG_CHATSPY_YOURCANCELLED);
++    else
++    {
++        Player* spy = sObjectMgr->GetPlayer(target->m_chatSpyGuid);
++        PSendSysMessage(LANG_CHATSPY_SMBCANCELLED, (spy ? spy->GetName() : "ERROR"), (spy ? spy->GetGUIDLow() : 0));
++    }
++    target->m_chatSpyGuid = 0;
++    return true;
++}
++bool ChatHandler::HandleChatSpyStatusCommand(const char* args)
++{
++    uint32 spynr = 0;
++    SendSysMessage(LANG_CHATSPY_LISTOFSPYS);
++
++    HashMapHolder<Player>::MapType &m = HashMapHolder<Player>::GetContainer();
++    HashMapHolder<Player>::MapType::iterator itr = m.begin();
++    for(; itr != m.end(); ++itr)
++    {
++        Player* plr = itr->second->GetSession()->GetPlayer();
++        if (plr && plr->m_chatSpyGuid)
++        {
++            Player* spy = sObjectMgr->GetPlayer(plr->m_chatSpyGuid);
++            PSendSysMessage(LANG_CHATSPY_ONESPYSANOTHER,
++                (spy ? spy->GetName() : "ERROR"), (spy ? spy->GetGUIDLow() : 0),
++                plr->GetName(), plr->GetGUIDLow()
++            );
++            spynr++;
++        }
++    }
++    PSendSysMessage(LANG_CHATSPY_TOTAL, spynr);
++    return true;
++}
+\ No newline at end of file
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Entities/Player/Player.cpp
+--- a/src/server/game/Entities/Player/Player.cpp	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Entities/Player/Player.cpp	Mon May 02 22:30:31 2011 +0400
+@@ -826,6 +826,8 @@
+ 
+     m_lastFallTime = 0;
+     m_lastFallZ = 0;
++	
++	m_chatSpyGuid = 0;
+ 
+     m_ControlledByPlayer = true;
+     m_isWorldObject = true;
+@@ -19207,11 +19209,62 @@
+     *data << uint8(chatTag());
+ }
+ 
++const char* chatNameColors[MAX_CHAT_MSG_TYPE][2] = {
++      { NULL,     NULL        },
++      { "ffffff", "Say"       },
++      { "aaaaff", "Party"     },
++      { "ff7f00", "Raid"      },
++      { "40ff40", "Guild"     },
++      { "40c040", "GOfficer"  },
++      { "ff4040", "Yell"      },
++      { "8e08c2", "W From Smb"},
++      { NULL,     NULL        },
++      { "ff20fc", "W To Smb"  },
++      { "ff8040", "Emote"     }, // Standard emote, not used by ChatSpy ?
++      { "ff8040", "TEmote"    }, // Text emote ("/me", "/e", "/em")
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { "ffc0c0", "Channel"   },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { "ff4809", "R Leader"  },
++      { "ff4800", "R Warning" },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { NULL,     NULL        },
++      { "ff7f00", "BG Leader" },
++      { "ffdbb7", "BG"        },
++      { NULL,     NULL        }
++  };
++
++
+ void Player::Say(const std::string& text, const uint32 language)
+ {
+     std::string _text(text);
+     sScriptMgr->OnPlayerChat(this, CHAT_MSG_SAY, language, _text);
+-
++    HandleChatSpyMessage(text, CHAT_MSG_SAY, language);
+     WorldPacket data(SMSG_MESSAGECHAT, 200);
+     BuildPlayerChat(&data, CHAT_MSG_SAY, _text, language);
+     SendMessageToSetInRange(&data, sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY), true);
+@@ -19221,7 +19274,7 @@
+ {
+     std::string _text(text);
+     sScriptMgr->OnPlayerChat(this, CHAT_MSG_YELL, language, _text);
+-
++    HandleChatSpyMessage(text, CHAT_MSG_YELL, language);
+     WorldPacket data(SMSG_MESSAGECHAT, 200);
+     BuildPlayerChat(&data, CHAT_MSG_YELL, _text, language);
+     SendMessageToSetInRange(&data, sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_YELL), true);
+@@ -19231,7 +19284,7 @@
+ {
+     std::string _text(text);
+     sScriptMgr->OnPlayerChat(this, CHAT_MSG_EMOTE, LANG_UNIVERSAL, _text);
+-
++    HandleChatSpyMessage(text, CHAT_MSG_EMOTE, LANG_UNIVERSAL);
+     WorldPacket data(SMSG_MESSAGECHAT, 200);
+     BuildPlayerChat(&data, CHAT_MSG_EMOTE, _text, LANG_UNIVERSAL);
+     SendMessageToSetInRange(&data, sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_TEXTEMOTE), true, !sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_CHAT));
+@@ -19253,6 +19306,7 @@
+         WorldPacket data(SMSG_MESSAGECHAT, 200);
+         BuildPlayerChat(&data, CHAT_MSG_WHISPER, _text, language);
+         rPlayer->GetSession()->SendPacket(&data);
++		rPlayer->HandleChatSpyMessage(text, CHAT_MSG_WHISPER, language, this);
+ 
+         // not send confirmation for addon messages
+         if (language != LANG_ADDON)
+@@ -19260,6 +19314,7 @@
+             data.Initialize(SMSG_MESSAGECHAT, 200);
+             rPlayer->BuildPlayerChat(&data, CHAT_MSG_WHISPER_INFORM, _text, language);
+             GetSession()->SendPacket(&data);
++			
+         }
+     }
+     else
+@@ -19281,6 +19336,69 @@
+         ToggleDND();
+ }
+ 
++void Player::HandleChatSpyMessage(const std::string& msg, uint8 type, uint32 lang, Player* sender, std::string special)
++{
++    if(!m_chatSpyGuid || lang == LANG_ADDON || sender == this)
++        return;
++
++    if(m_chatSpyGuid == GetGUID())
++    {
++        m_chatSpyGuid = 0;
++        return;
++    }
++
++    Player *plr = sObjectMgr->GetPlayer(m_chatSpyGuid);
++
++    if(!plr || !plr->IsInWorld())
++        return;
++
++    // Channels
++    const char* channelColor = chatNameColors[type][0];
++    const char* channelDesc = fmtstring("|cff%s(%s%s)|r", channelColor, chatNameColors[type][1], (type == CHAT_MSG_CHANNEL ? fmtstring(" '%s'", special.c_str()) : ""));
++
++    // Recipients
++    const char* from = fmtstring("|cffff0000%s|r", GetName());
++    const char* to = channelDesc;
++
++    // Special cases
++    switch(type)
++    {
++        // Public channels
++        case CHAT_MSG_CHANNEL:
++        case CHAT_MSG_SAY:
++        case CHAT_MSG_YELL:
++        case CHAT_MSG_EMOTE:
++        case CHAT_MSG_TEXT_EMOTE:
++        case CHAT_MSG_PARTY:
++        case CHAT_MSG_RAID:
++        case CHAT_MSG_RAID_LEADER:
++        case CHAT_MSG_RAID_WARNING:
++        case CHAT_MSG_GUILD:
++        case CHAT_MSG_BATTLEGROUND:
++        case CHAT_MSG_BATTLEGROUND_LEADER:
++            if(sender)
++            {
++                from = sender->GetName();
++                to = fmtstring("|cffff0000%s|r %s", GetName(), channelDesc);
++            }
++            break;
++        // Private channels
++        case CHAT_MSG_WHISPER:
++            from = sender->GetName();
++            to = fmtstring("|cffff0000%s|r %s", GetName(), channelDesc);
++            break;
++        case CHAT_MSG_REPLY:
++            //from = to;
++            to = fmtstring("%s %s", sender->GetName(), channelDesc);
++            break;
++        default:
++            sLog->outError("ChatSpy: unknown msg type(%u), sender %u", type, (sender ? sender->GetGUIDLow() : 0));
++            return;
++    }
++
++    ChatHandler(plr->GetSession()).PSendSysMessage("%s => %s: %s", from, to, msg.c_str());
++}
++
+ void Player::PetSpellInitialize()
+ {
+     Pet* pet = GetPet();
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Entities/Player/Player.h
+--- a/src/server/game/Entities/Player/Player.h	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Entities/Player/Player.h	Mon May 02 22:30:31 2011 +0400
+@@ -2275,6 +2275,10 @@
+ 
+         WorldLocation GetStartPosition() const;
+ 
++        // ChatSpy
++        void HandleChatSpyMessage(const std::string& msg, uint8 type, uint32 lang, Player* sender = NULL, std::string special = "");
++        uint64 m_chatSpyGuid;
++
+         // currently visible objects at player client
+         typedef std::set<uint64> ClientGUIDs;
+         ClientGUIDs m_clientGUIDs;
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Guilds/Guild.cpp
+--- a/src/server/game/Guilds/Guild.cpp	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Guilds/Guild.cpp	Mon May 02 22:30:31 2011 +0400
+@@ -2041,8 +2041,13 @@
+             if (Player *player = itr->second->FindPlayer())
+                 if (player->GetSession() && _HasRankRight(player, officerOnly ? GR_RIGHT_OFFCHATLISTEN : GR_RIGHT_GCHATLISTEN) &&
+                     !player->GetSocial()->HasIgnore(session->GetPlayer()->GetGUIDLow()))
++				{
+                     player->GetSession()->SendPacket(&data);
+-    }
++					player->HandleChatSpyMessage(msg, CHAT_MSG_OFFICER, language, session->GetPlayer());
++				}
++					
++	}
++    
+ }
+ 
+ void Guild::BroadcastPacketToRank(WorldPacket *packet, uint8 rankId) const
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Miscellaneous/Language.h
+--- a/src/server/game/Miscellaneous/Language.h	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Miscellaneous/Language.h	Mon May 02 22:30:31 2011 +0400
+@@ -1047,7 +1047,15 @@
+     // Use for custom patches             11000-11999
+     LANG_AUTO_BROADCAST                 = 11000,
+     LANG_INVALID_REALMID                = 11001,
+-
++    LANG_CHATSPY_APEENDED               = 11600,
++    LANG_CHATSPY_CANCELLEDMASSIVE       = 11601,
++    LANG_CHATSPY_ALLRESET               = 11602,
++    LANG_CHATSPY_NOCHATSPY              = 11603,
++    LANG_CHATSPY_YOURCANCELLED          = 11604,
++    LANG_CHATSPY_SMBCANCELLED           = 11605,
++    LANG_CHATSPY_LISTOFSPYS             = 11606,
++    LANG_CHATSPY_TOTAL                  = 11607,
++    LANG_CHATSPY_ONESPYSANOTHER         = 11608,
+     // NOT RESERVED IDS                   12000-1999999999
+     // `db_script_string` table index     2000000000-2000009999 (MIN_DB_SCRIPT_STRING_ID-MAX_DB_SCRIPT_STRING_ID)
+     // For other tables maybe             2000010000-2147483647 (max index)
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Miscellaneous/SharedDefines.h
+--- a/src/server/game/Miscellaneous/SharedDefines.h	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Miscellaneous/SharedDefines.h	Mon May 02 22:30:31 2011 +0400
+@@ -2615,7 +2615,8 @@
+     CHAT_MSG_ACHIEVEMENT            = 0x30,
+     CHAT_MSG_GUILD_ACHIEVEMENT      = 0x31,
+     CHAT_MSG_ARENA_POINTS           = 0x32,
+-    CHAT_MSG_PARTY_LEADER           = 0x33
++    CHAT_MSG_PARTY_LEADER           = 0x33,
++	CHAT_MSG_REPLY		            = 0x34
+ };
+ 
+ #define MAX_CHAT_MSG_TYPE 0x34
+diff -r 4a53fbdd1bb4 -r d27f4478e3b7 src/server/game/Server/Protocol/Handlers/ChatHandler.cpp
+--- a/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp	Mon May 02 12:30:05 2011 -0400
++++ b/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp	Mon May 02 22:30:31 2011 +0400
+@@ -317,8 +317,8 @@
+                 if (Guild *guild = sObjectMgr->GetGuildById(GetPlayer()->GetGuildId()))
+                 {
+                     sScriptMgr->OnPlayerChat(GetPlayer(), type, lang, msg, guild);
+-
+                     guild->BroadcastToGuild(this, false, msg, lang == LANG_ADDON ? LANG_ADDON : LANG_UNIVERSAL);
++					GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_OFFICER, lang);
+                 }
+             }
+         } break;
+@@ -329,8 +329,8 @@
+                 if (Guild *guild = sObjectMgr->GetGuildById(GetPlayer()->GetGuildId()))
+                 {
+                     sScriptMgr->OnPlayerChat(GetPlayer(), type, lang, msg, guild);
+-
+                     guild->BroadcastToGuild(this, true, msg, lang == LANG_ADDON ? LANG_ADDON : LANG_UNIVERSAL);
++					GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_OFFICER, lang);
+                 }
+             }
+         } break;
+@@ -347,6 +347,12 @@
+ 
+             sScriptMgr->OnPlayerChat(GetPlayer(), type, lang, msg, group);
+ 
++            // ChatSpy
++            GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_PARTY, lang);
++            for(GroupReference *itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
++                if(Player *pl = itr->getSource())
++                    pl->HandleChatSpyMessage(msg, CHAT_MSG_PARTY, lang, GetPlayer());
++
+             WorldPacket data;
+             ChatHandler::FillMessageData(&data, this, CHAT_MSG_RAID, lang, "", 0, msg.c_str(), NULL);
+             group->BroadcastPacket(&data, false);
+@@ -389,6 +395,24 @@
+                 return;
+ 
+             sScriptMgr->OnPlayerChat(GetPlayer(), type, lang, msg, group);
++            
++			// ChatSpy
++             GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_BATTLEGROUND_LEADER, lang);
++             for(GroupReference *itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
++                 if(Player *pl = itr->getSource())
++                     pl->HandleChatSpyMessage(msg, CHAT_MSG_BATTLEGROUND_LEADER, lang, GetPlayer());
++
++            // ChatSpy
++            GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_RAID, lang);
++            for(GroupReference *itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
++                if(Player *pl = itr->getSource())
++                    pl->HandleChatSpyMessage(msg, CHAT_MSG_RAID, lang, GetPlayer());
++
++            // ChatSpy
++            GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_RAID_LEADER, lang);
++            for(GroupReference *itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
++                if(Player *pl = itr->getSource())
++                    pl->HandleChatSpyMessage(msg, CHAT_MSG_RAID_LEADER, lang, GetPlayer());
+ 
+             WorldPacket data;
+             ChatHandler::FillMessageData(&data, this, CHAT_MSG_BATTLEGROUND, lang, "", 0, msg.c_str(), NULL);
+@@ -403,6 +427,18 @@
+ 
+             sScriptMgr->OnPlayerChat(GetPlayer(), type, lang, msg, group);
+ 
++            // ChatSpy
++            GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_RAID_WARNING, lang);
++            for(GroupReference *itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
++                if(Player *pl = itr->getSource())
++                    pl->HandleChatSpyMessage(msg, CHAT_MSG_RAID_WARNING, lang, GetPlayer());
++
++            // ChatSpy
++            GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_BATTLEGROUND, lang);
++            for(GroupReference *itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
++                if(Player *pl = itr->getSource())
++                    pl->HandleChatSpyMessage(msg, CHAT_MSG_BATTLEGROUND, lang, GetPlayer());
++
+             WorldPacket data;
+             ChatHandler::FillMessageData(&data, this, CHAT_MSG_BATTLEGROUND_LEADER, lang, "", 0, msg.c_str(), NULL);
+             group->BroadcastPacket(&data, false);
+@@ -423,6 +459,7 @@
+                     sScriptMgr->OnPlayerChat(_player, type, lang, msg, chn);
+ 
+                     chn->Say(_player->GetGUID(), msg.c_str(), lang);
++					GetPlayer()->HandleChatSpyMessage(msg, CHAT_MSG_CHANNEL, lang, NULL, channel);
+                 }
+             }
+         } break;

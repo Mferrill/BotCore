@@ -1,0 +1,81 @@
+# User M.hack3r@yahoo.com
+# Date 1303676534 -14400
+# Node ID 23ce1bcb226ba920e3ae5309d6f8b466965941cc
+# Parent  7619a1afc784c459ca53349df151e0eb620b18dc
+
+diff -r 7619a1afc784 -r 23ce1bcb226b src/server/game/Server/Protocol/Handlers/DuelHandler.cpp
+--- a/src/server/game/Server/Protocol/Handlers/DuelHandler.cpp	Mon Apr 25 00:02:18 2011 +0400
++++ b/src/server/game/Server/Protocol/Handlers/DuelHandler.cpp	Mon Apr 25 00:22:14 2011 +0400
+@@ -51,6 +51,31 @@
+ 
+     pl->SendDuelCountdown(3000);
+     plTarget->SendDuelCountdown(3000);
++	
++	if (sWorld->getIntConfig(CONFIG_DUEL_RESET_COOLDOWN) == 1)
++	{
++		pl->SetHealth(pl->GetMaxHealth());
++		plTarget->SetHealth(plTarget->GetMaxHealth());
++		
++		if (pl->getPowerType() == POWER_MANA) 
++			pl->SetPower(POWER_MANA, pl->GetMaxPower(POWER_MANA));
++		if (plTarget->getPowerType() == POWER_MANA)
++			plTarget->SetPower(POWER_MANA, plTarget->GetMaxPower(POWER_MANA));
++		if (pl->getPowerType() == POWER_RAGE) 
++			pl->SetPower(POWER_RAGE, 0);
++		if (plTarget->getPowerType() == POWER_RAGE)
++			plTarget->SetPower(POWER_RAGE, 0);
++		if (pl->getPowerType() == POWER_RUNIC_POWER) 
++			pl->SetPower(POWER_RUNIC_POWER, 0);
++		if (plTarget->getPowerType() == POWER_RUNIC_POWER)
++			plTarget->SetPower(POWER_RUNIC_POWER, 0);
++		
++		if (!pl->GetMap()->IsDungeon())
++		{
++			pl->RemoveArenaSpellCooldowns();
++			plTarget->RemoveArenaSpellCooldowns();
++		}
++	}
+ }
+ 
+ void WorldSession::HandleDuelCancelledOpcode(WorldPacket& recvPacket)
+diff -r 7619a1afc784 -r 23ce1bcb226b src/server/game/World/World.cpp
+--- a/src/server/game/World/World.cpp	Mon Apr 25 00:02:18 2011 +0400
++++ b/src/server/game/World/World.cpp	Mon Apr 25 00:22:14 2011 +0400
+@@ -1219,6 +1219,8 @@
+ 
+     // MySQL ping time interval
+     m_int_configs[CONFIG_DB_PING_INTERVAL] = sConfig->GetIntDefault("MaxPingTime", 30);
++	
++	m_int_configs[CONFIG_DUEL_RESET_COOLDOWN] = sConfig->GetIntDefault("DuelResetCooldown", 1);
+ 
+     sScriptMgr->OnConfigLoad(reload);
+ }
+diff -r 7619a1afc784 -r 23ce1bcb226b src/server/game/World/World.h
+--- a/src/server/game/World/World.h	Mon Apr 25 00:02:18 2011 +0400
++++ b/src/server/game/World/World.h	Mon Apr 25 00:22:14 2011 +0400
+@@ -306,6 +306,7 @@
+     CONFIG_PRESERVE_CUSTOM_CHANNEL_DURATION,
+     CONFIG_PERSISTENT_CHARACTER_CLEAN_FLAGS,
+     CONFIG_MAX_INSTANCES_PER_HOUR,
++	CONFIG_DUEL_RESET_COOLDOWN,
+     INT_CONFIG_VALUE_COUNT
+ };
+ 
+diff -r 7619a1afc784 -r 23ce1bcb226b src/server/worldserver/worldserver.conf.dist
+--- a/src/server/worldserver/worldserver.conf.dist	Mon Apr 25 00:02:18 2011 +0400
++++ b/src/server/worldserver/worldserver.conf.dist	Mon Apr 25 00:22:14 2011 +0400
+@@ -2793,3 +2793,13 @@
+ 
+ #
+ ###################################################################################################
++
++###################################################################################################
++# OTHER
++#
++#    DuelResetCooldown
++#		Description: Reseting cooldown and restore health to start duel
++#		Default: 1 - Enable
++#
++ 
++ DuelResetCooldown = 1
+\ No newline at end of file

@@ -1,0 +1,72 @@
+# User M.hack3r@yahoo.com
+# Date 1303669176 -14400
+# Node ID 8fd64de4f0e17d47fa65e96d37b27cf41504ad0f
+# Parent  84bb92008eb527be032338934ce350e14d7d5b63
+
+--- a/src/server/game/Chat/Commands/Level1.cpp
++++ b/src/server/game/Chat/Commands/Level1.cpp
+@@ -50,6 +50,16 @@ bool ChatHandler::HandleNameAnnounceComm
+     return true;
+ }
+ 
++bool ChatHandler::HandleDevAnnounceCommand(const char* args)
++{
++    WorldPacket data;
++    if (!*args)
++        return false;
++
++    sWorld->SendWorldText(LANG_DEV_ANNOUNCE, m_session->GetPlayer()->GetName(), args);
++    return true;
++}
++
+ bool ChatHandler::HandleGMNameAnnounceCommand(const char* args)
+ {
+     WorldPacket data;
+
+--- a/src/server/game/Chat/Chat.h
++++ b/src/server/game/Chat/Chat.h
+@@ -132,6 +132,7 @@ class ChatHandler
+         bool ShowHelpForSubCommands(ChatCommand *table, char const* cmd, char const* subcmd);
+ 
+         bool HandleNameAnnounceCommand(const char* args);
++	 bool HandleDevAnnounceCommand(const char* args);
+         bool HandleGMNameAnnounceCommand(const char* args);
+         bool HandleGMAnnounceCommand(const char* args);
+         bool HandleGMNotifyCommand(const char* args);
+
+--- a/src/server/game/Miscellaneous/Language.h
++++ b/src/server/game/Miscellaneous/Language.h
+@@ -337,10 +337,11 @@ enum TrinityStrings
+     LANG_TITLE_REMOVE_RES               = 354,
+     LANG_TITLE_CURRENT_RES              = 355,
+     LANG_CURRENT_TITLE_RESET            = 356,
+-    // Room for more level 2              359-399 not used
++    // Room for more level 2              360-399 not used
+ 	//dev command
+ 	LANG_DEV_ON                         = 357,
+        LANG_DEV_OFF                        = 358,
++	LANG_DEV_ANNOUNCE                   = 359,
+ 
+     // level 3 chat
+     LANG_SCRIPTS_RELOADED               = 400,
+
+--- /dev/null
++++ b/sql/updates/dev_announce_mode.sql
+@@ -0,0 +1,6 @@
++DELETE FROM `trinity_string` WHERE `entry`=359;
++INSERT INTO `trinity_string` VALUES ('359', '|cffffff00[|c1f40af20Announce by|r |cffff0000%s|cffffff00]:|r %s|r', null, null, null, null, null, null, null, '|cffffff00[|c1f0000FF?????????? ?? ??????????|r |cff00FF00%s|cffffff00]:|r %s|r');
++
++DELETE FROM `command` WHERE `name` = 'devannounce';	
++INSERT INTO `command` VALUES ('devannounce', '4', 'Syntax: .devnameannounce $devannounce.
++Send an devannounce to all online players, displaying the name of the sender.');
+
+--- a/src/server/game/Chat/Chat.cpp
++++ b/src/server/game/Chat/Chat.cpp
+@@ -378,6 +378,7 @@ ChatCommand * ChatHandler::getCommandTab
+         { "aura",           SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleAuraCommand>,                "", NULL },
+         { "unaura",         SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleUnAuraCommand>,              "", NULL },
+         { "nameannounce",   SEC_MODERATOR,      false, OldHandler<&ChatHandler::HandleNameAnnounceCommand>,        "", NULL },
++	 { "devannounce",    SEC_DEVELOPER,      false, OldHandler<&ChatHandler::HandleDevAnnounceCommand>,     "", NULL },
+         { "gmnameannounce", SEC_MODERATOR,      false, OldHandler<&ChatHandler::HandleGMNameAnnounceCommand>,      "", NULL },
+         { "announce",       SEC_MODERATOR,      true,  OldHandler<&ChatHandler::HandleAnnounceCommand>,            "", NULL },
+         { "gmannounce",     SEC_MODERATOR,      true,  OldHandler<&ChatHandler::HandleGMAnnounceCommand>,          "", NULL },

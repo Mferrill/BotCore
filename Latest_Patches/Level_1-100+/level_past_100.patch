@@ -1,0 +1,64 @@
+From 6a6fe3372aa88810cb67efbf6b47b15bf6234bea Mon Sep 17 00:00:00 2001
+From: Terrorblade <Terrorblade@?_?>
+Date: Tue, 7 Jun 2011 18:36:06 -0400
+Subject: [PATCH] WoW Error Free 100+
+
+---
+ src/server/game/Entities/Player/Player.cpp |    2 +-
+ src/server/game/Entities/Unit/Unit.cpp     |    6 +++++-
+ src/server/game/Entities/Unit/Unit.h       |    3 ++-
+ 3 files changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
+index 3ed5f36..565eda8 100755
+--- a/src/server/game/Entities/Player/Player.cpp
++++ b/src/server/game/Entities/Player/Player.cpp
+@@ -16437,7 +16437,7 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder)
+     bytes0 |= Gender << 16;                                 // gender
+     SetUInt32Value(UNIT_FIELD_BYTES_0, bytes0);
+ 
+-    SetUInt32Value(UNIT_FIELD_LEVEL, fields[6].GetUInt8());
++    SetLevel(fields[6].GetUInt8());
+     SetUInt32Value(PLAYER_XP, fields[7].GetUInt32());
+ 
+     _LoadIntoDataField(fields[61].GetCString(), PLAYER_EXPLORED_ZONES_1, PLAYER_EXPLORED_ZONES_SIZE);
+diff --git a/src/server/game/Entities/Unit/Unit.cpp b/src/server/game/Entities/Unit/Unit.cpp
+index a4b0041..e17dffd 100755
+--- a/src/server/game/Entities/Unit/Unit.cpp
++++ b/src/server/game/Entities/Unit/Unit.cpp
+@@ -13438,7 +13438,11 @@ float Unit::GetWeaponDamageRange(WeaponAttackType attType , WeaponDamageRange ty
+ 
+ void Unit::SetLevel(uint8 lvl)
+ {
+-    SetUInt32Value(UNIT_FIELD_LEVEL, lvl);
++	true_level = lvl;
++	if(lvl > 100 && GetTypeId() == TYPEID_PLAYER)
++        SetUInt32Value(UNIT_FIELD_LEVEL, 100);
++	else
++		SetUInt32Value(UNIT_FIELD_LEVEL, lvl);
+ 
+     // group update
+     if (GetTypeId() == TYPEID_PLAYER && this->ToPlayer()->GetGroup())
+diff --git a/src/server/game/Entities/Unit/Unit.h b/src/server/game/Entities/Unit/Unit.h
+index e418091..52b86d9 100755
+--- a/src/server/game/Entities/Unit/Unit.h
++++ b/src/server/game/Entities/Unit/Unit.h
+@@ -1245,7 +1245,7 @@ class Unit : public WorldObject
+         bool isTotem() const    { return m_unitTypeMask & UNIT_MASK_TOTEM; }
+         bool IsVehicle() const  { return m_unitTypeMask & UNIT_MASK_VEHICLE; }
+ 
+-        uint8 getLevel() const { return uint8(GetUInt32Value(UNIT_FIELD_LEVEL)); }
++        uint8 getLevel() const { return true_level; }
+         uint8 getLevelForTarget(WorldObject const* /*target*/) const { return getLevel(); }
+         void SetLevel(uint8 lvl);
+         uint8 getRace() const { return GetByteValue(UNIT_FIELD_BYTES_0, 0); }
+@@ -2199,6 +2199,7 @@ class Unit : public WorldObject
+ 
+         bool m_cleanupDone; // lock made to not add stuff after cleanup before delete
+         bool m_duringRemoveFromWorld; // lock made to not add stuff after begining removing from world
++		uint8 true_level;
+ };
+ 
+ namespace Trinity
+-- 
+1.7.3.1.msysgit.0

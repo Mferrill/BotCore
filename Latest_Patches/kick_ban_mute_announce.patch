@@ -1,0 +1,97 @@
+# User M.hack3r@yahoo.com
+# Date 1303654384 -14400
+# Node ID 0520b5108ca519e3792b4bfd52ed6c55a281d99b
+# Parent  53afb07ddd95f03e62b54f61effa26468f4e46aa
+
+--- a/src/server/game/Chat/Commands/Level2.cpp
++++ b/src/server/game/Chat/Commands/Level2.cpp
+@@ -54,8 +54,16 @@ bool ChatHandler::HandleMuteCommand(cons
+ 
+     char *mutereason = strtok(NULL, "\r");
+     std::string mutereasonstr = "No reason";
++    std::string announce;
+     if (mutereason != NULL)
+          mutereasonstr = mutereason;
++	
++    if(!mutereason)
++    {
++        PSendSysMessage("You must enter a reason of mute");
++        SetSentErrorMessage(true);
++        return false;
++    }
+ 
+     Player* target;
+     uint64 target_guid;
+@@ -89,6 +97,16 @@ bool ChatHandler::HandleMuteCommand(cons
+     std::string nameLink = playerLink(target_name);
+ 
+     PSendSysMessage(LANG_YOU_DISABLE_CHAT, nameLink.c_str(), notspeaktime, mutereasonstr.c_str());
++    
++    announce = "The character '";
++    announce += nameStr;
++    announce += "' was muted for ";
++    announce += delayStr;
++    announce += " minutes by the character '";
++    announce += m_session->GetPlayerName();
++    announce += "'. The reason is: ";
++    announce += mutereason;
++    HandleAnnounceCommand(announce.c_str());
+ 
+     return true;
+ }
+@@ -207,6 +225,7 @@ bool ChatHandler::HandleKickPlayerComman
+ {
+     Player* target = NULL;
+     std::string playerName;
++    std::string announce;
+     if (!extractPlayerTarget((char*)args, &target, NULL, &playerName))
+         return false;
+ 
+@@ -227,6 +246,14 @@ bool ChatHandler::HandleKickPlayerComman
+         PSendSysMessage(LANG_COMMAND_KICKMESSAGE, playerName.c_str());
+ 
+     target->GetSession()->KickPlayer();
++	
++    announce = "The character '";
++    announce += target->GetName();
++    announce += "' was kicked by the character '";
++    announce += m_session->GetPlayerName();
++    announce += "'.";
++    HandleAnnounceCommand(announce.c_str());
++
+     return true;
+ }
+ 
+
+--- a/src/server/game/Chat/Commands/Level3.cpp
++++ b/src/server/game/Chat/Commands/Level3.cpp
+@@ -2932,6 +2932,7 @@ bool ChatHandler::HandleBanHelper(BanMod
+         return false;
+ 
+     std::string nameOrIP = cnameOrIP;
++    std::string announce;
+ 
+     char* duration = strtok (NULL," ");
+     if (!duration || !atoi(duration))
+@@ -2991,6 +2992,21 @@ bool ChatHandler::HandleBanHelper(BanMod
+             SetSentErrorMessage(true);
+             return false;
+     }
++    
++    if (mode == BAN_CHARACTER)
++        announce = "The character '";
++    else if (mode == BAN_IP)
++        announce = "The IP '";
++    else
++    announce = "Account '";
++    announce += nameOrIP.c_str();
++    announce += "' was banned for ";
++    announce += duration;
++    announce += " by the character '";
++    announce += m_session->GetPlayerName();
++    announce += "'. The reason is: ";
++    announce += reason;
++    HandleAnnounceCommand(announce.c_str());
+ 
+     return true;
+ }
